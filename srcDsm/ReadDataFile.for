@@ -88,7 +88,7 @@
 ************************************************************************
 *     Update for Timoshenko's theory                                   *
 * 04/2021 by Tanguy BEVANCON                                           *
-*tanguy.bevancon@supmeca.fr                                            *
+*tanguy.bevancon@edu.supmeca.fr                                        *
 ************************************************************************
   
       SUBROUTINE READDATAFILE(FILENAME,NMAX,EMAX,MMAX,SMAX,CAT,NODES,NN,
@@ -112,7 +112,7 @@
       CHARACTER(9) CODE
       INTEGER I,J,K
 *     update for timoshenko's method
-      LOGICAL TIMOSHENKO
+      LOGICAL TIMOSHENKO,CIRCULAR
       
 * Opening the datafile and reading the first line                      *
       OPEN(10,FILE=FILENAME)
@@ -156,7 +156,7 @@
               READ(10,*) CODE,NS
           END DO
           DO I=1,NS
-              READ(10,*) K,(SECTS(K,J),J=1,3)
+              READ(10,*) K,(SECTS(K,J),J=1,4)
           ENDDO
       ELSE
 *       Use of Bernoulli or Rayleigh                                   *      

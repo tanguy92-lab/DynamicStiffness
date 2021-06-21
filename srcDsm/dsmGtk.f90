@@ -35,6 +35,12 @@
 !     solves the symmetric linear algebraic system (ZSYSV)             !    
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! This program has been updatedby Tanguy BEVANCON 					   !
+! tanguy.bevancon@edu.supmeca.fr						         	   !
+! 04/2021-07/2021													   !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -65,7 +71,7 @@ module common_Dsm
 
 !Modification of structure type for Timoshenko : 04/2021			   !
    type Structure
-	  double precision nodes(nmax,2),mates(mmax,4),sects(smax,3)
+	  double precision nodes(nmax,2),mates(mmax,4),sects(smax,4)
       integer elems(emax,5)
       integer nn,ne,nm,ns
       character*7 cat
@@ -137,7 +143,8 @@ module handlers
   use cairo, only: cairo_create,cairo_curve_to, cairo_destroy,&
   & cairo_line_to,cairo_move_to,cairo_paint,cairo_set_line_width,&
   & cairo_set_source,cairo_set_source_rgb, cairo_stroke,&
-  & cairo_image_surface_get_width, cairo_rectangle, cairo_show_text
+  & cairo_image_surface_get_width, cairo_rectangle, cairo_show_text,&
+  & cairo_arc,cairo_arc_negative,cairo_fill
   use gdk, only: gdk_cairo_set_source_pixbuf, gdk_cairo_create 
   use gdk_pixbuf, only: gdk_pixbuf_get_has_alpha,&
   & gdk_pixbuf_get_n_channels,gdk_pixbuf_get_pixels,&
@@ -272,10 +279,10 @@ module handlers
     WRITE(*,*) 'Number of sections : ',val%pStruct%ns
     PRINT*
 ! Timoshenko's parameters are added : 04/2021						   !
-    WRITE(*,'(3A3,7A9,A7)') 'NB','N1','N2','DENS','E','TgD','Nu','S',&
-   &                        'IZ','kY','THEORY'
+    WRITE(*,'(3A3,8A9,A7)') 'NB','N1','N2','DENS','E','TgD','Nu','S',&
+   &                        'IZ','kY','radius','THEORY'
     DO i=1,val%pStruct%NE
-       WRITE(*,'(3I3,7D9.2,I7)') i,val%pStruct%elems(i,1),&
+       WRITE(*,'(3I3,8D9.2,I7)') i,val%pStruct%elems(i,1),&
       &val%pStruct%elems(i,2),&
       &val%pStruct%mates(val%pStruct%elems(i,3),1),&
       &val%pStruct%mates(val%pStruct%elems(i,3),2),&
@@ -284,6 +291,7 @@ module handlers
       &val%pStruct%sects(val%pStruct%elems(i,4),1),&
       &val%pStruct%sects(val%pStruct%elems(i,4),2),&
       &val%pStruct%sects(val%pStruct%elems(i,4),3),&
+      &val%pStruct%sects(val%pStruct%elems(i,4),4),&
       &val%pStruct%elems(i,5)
     ENDDO
     
@@ -580,17 +588,65 @@ module handlers
        py=h/2+(my-y)*fy
      endif
   end subroutine coords2pixs
-
+  
+! function to get the coordinates of the center from 2 points		   !
+  subroutine getcenter(x1,y1,x2,y2,r,xcenter,ycenter)
+	 implicit none
+	 real(kind=8)::x1,y1,x2,y2,r,xmiddle,ymiddle,xcenter,ycenter
+	 real(kind=8)::xvector,yvector,l,l2
+	 
+	 xmiddle = (x1+x2)/2
+	 ymiddle = (y1+y2)/2
+! calculation of the distance between the 2 points	    		       !	 
+	 l = sqrt((x1-x2)**2+(y1-y2)**2)
+	 l2 = sqrt(r**2-(l/2)**2)
+! the center is founded with a vector product		     			   !
+	 yvector = -(x2-x1)/l
+	 xvector = (y2-y1)/l
+	 xcenter = xmiddle + l2*xvector
+	 ycenter = ymiddle + l2*yvector
+	 
+  end subroutine getcenter
+  
+! function to get the angle between the center of a circle and a point !
+! of his radius														   !
+  subroutine getangle(x,y,xc,yc,radius,alpha)
+	implicit none
+	real(kind=8)::x,y,xc,yc,radius,alpha
+	real(kind=8)::xvect,yvect,pdtscal,pdtvect,pi
+	
+	pi = 4.D0*DATAN(1.D0)
+	xvect = (x-xc)/radius
+	yvect = (y-yc)/radius
+! the scalar product give the cosinus								   !
+	pdtscal = xvect
+! the vector product give the sinus									   !
+	pdtvect = -yvect
+	if (pdtscal.GT.0) then
+		alpha = atan(pdtvect/pdtscal)
+	elseif (pdtscal.LT.0) then
+		alpha = pi + atan(pdtvect/pdtscal)
+	else
+		alpha = asin(pdtvect)
+	endif
+	
+  end subroutine getangle
+	 
+	 
 !  Drawing structure subroutine                                        !
    subroutine draw_2Dframe(area,gdata)
     implicit none
     type(c_ptr),value :: area,gdata
     type(Wdgts),pointer::val
     type(c_ptr) :: cc 
-    real(kind=8)::x1,y1,x2,y2,xmin,xmax,ymin,ymax,px1,py1,px2,py2
+    real(kind=8)::x1,y1,x2,y2,x3,y3,xmin,xmax,ymin,ymax,px1,py1,px2,py2
+    real(kind=8)::px3,py3,length1,length2,pi,teta
+    real(kind=8)::radius,getradius,angle1,angle2,radiuspix,radiuspix2
     integer i
        
     call c_f_pointer(gdata, val)
+
+    pi = 4.D0*DATAN(1.D0)
 
 ! Real dimensions of the structure                                     !
     xmin=val%pStruct%xmin
@@ -598,7 +654,7 @@ module handlers
     xmax=val%pStruct%xmax
     ymax=val%pStruct%ymax
    
-! Get a cairo context from the drawing area.
+! Get a cairo context from the drawing area.						   !
     cc = hl_gtk_drawing_area_cairo_new(area)
     
 ! White color is selected                                              !
@@ -609,21 +665,86 @@ module handlers
     do i=1,val%pStruct%ne
        x1=val%pStruct%nodes(val%pStruct%elems(i,1),1)
        y1=val%pStruct%nodes(val%pStruct%elems(i,1),2)
+	 ! We transform the coordinates for the graphic window			   !
        call coords2pixs(x1,y1,xmin,xmax,ymin,ymax,px1,py1,width,height,&
       &1.D0)
        x2=val%pStruct%nodes(val%pStruct%elems(i,2),1)
        y2=val%pStruct%nodes(val%pStruct%elems(i,2),2)
+     ! We transform the coordinates for the graphic window			   !
        call coords2pixs(x2,y2,xmin,xmax,ymin,ymax,px2,py2,width,height,&
       &1.D0)
-       call cairo_move_to(cc, px1,py1)  
-       call cairo_line_to(cc, px2,py2)
-       call cairo_stroke(cc) 
+      
+!	Modification for the circular beam theory : 06/2021				   !
+
+     ! Depending on the type of element, drawing either straight beam  !
+     ! or curve beam												   !
+      radius = val%pStruct%sects(val%pStruct%elems(i,4),4)
+      if (radius.EQ.0) then
+		   call cairo_move_to(cc, px1,py1)
+		   call cairo_line_to(cc, px2,py2)
+		   call cairo_stroke(cc)
+	  elseif (radius.LT.0.0) then
+		   radius = abs(val%pStruct%sects(val%pStruct%elems(i,4),4))
+		   length1=sqrt((x1-x2)**2+(y1-y2)**2)
+		  ! Check if it's possible to create the circle				   !
+		   if (radius.LT.(length1/2)) then
+				write(*,*) 'Radius too short, impossible for element', i
+				write(*,*) 'Please retry with a correct value'
+				exit
+		   endif
+		   getradius=x1+radius
+		   
+		   call getcenter(x1,y1,x2,y2,radius,x3,y3)
+		   call coords2pixs(x3,y3,xmin,xmax,ymin,ymax,px3,py3,width,&
+		   &height,1.D0)
+		   call getangle(x1,y1,x3,y3,radius,angle1)
+		   
+		   call coords2pixs(getradius,y1,xmin,xmax,ymin,ymax,radiuspix,&
+		   &py1,width,height,1.D0)
+!  		   Get the value of the radius in the graphic window		   !
+		   radiuspix2 = sqrt((px1-radiuspix)**2)
+		   length2=length1/2
+!		   Teta is the opening angle between the 2 points			   !
+		   teta = 2*atan(length1/(2*sqrt((radius**2-length2**2))))
+		   angle2=angle1+teta
+!		   Draw the arc												   !
+		   call cairo_arc_negative(cc,px3,py3,radiuspix2,angle1,angle2)
+		   call cairo_stroke(cc)
+		   
+	  elseif (radius.GT.0.0) then
+		   radius = val%pStruct%sects(val%pStruct%elems(i,4),4)
+		   length1=sqrt((x1-x2)**2+(y1-y2)**2)
+		  ! Check if it's possible to create the circle				   !
+		   if (radius.LT.(length1/2)) then
+				write(*,*) 'Radius too short, impossible for element', i
+				write(*,*) 'Please retry with a correct value'
+				exit
+		   endif
+		   getradius=x1+radius
+		   
+		   call getcenter(x1,y1,x2,y2,radius,x3,y3)
+		   call coords2pixs(x3,y3,xmin,xmax,ymin,ymax,px3,py3,width,&
+		   &height,1.D0)
+		   call getangle(x1,y1,x3,y3,radius,angle1)
+		   
+		   call coords2pixs(getradius,y1,xmin,xmax,ymin,ymax,radiuspix,&
+		   &py1,width,height,1.D0)
+!  		   Get the value of the radius in the graphic window		   !
+		   radiuspix2 = sqrt((px1-radiuspix)**2)
+		   length2=length1/2
+!		   Teta is the opening angle between the 2 points			   !
+		   teta = 2*atan(length1/(2*sqrt((radius**2-length2**2))))
+		   angle2=angle1+teta
+!		   Draw the arc												   !
+		   call cairo_arc(cc, px3, py3, radiuspix2, angle1, angle2)
+		   call cairo_stroke(cc)
+	  endif
     enddo
     call gtk_widget_queue_draw(area)
     call hl_gtk_drawing_area_cairo_destroy(cc)
   end subroutine draw_2Dframe
   
-! Drawing curve subroutine                                             ! 
+! Drawing curve subroutine                                             !
     subroutine draw_curve(area,gdata,nfreq,nfreqmax,curve) 
     implicit none
     type(c_ptr),value :: area,gdata
@@ -635,7 +756,7 @@ module handlers
     type (c_ptr) :: cc,c_text
 
 ! Dimensions of the curve are calculated                               !
-    xy=minval(curve,dim=1) 
+    xy=minval(curve,dim=1)
     xmin=xy(1)
     ymin=xy(2)
     xy=maxval(curve,dim=1)

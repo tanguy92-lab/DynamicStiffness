@@ -183,7 +183,7 @@ module handlers
     call gdk_cairo_set_source_pixbuf(cc,image,0d0,0d0)
     call cairo_paint(cc)
 
-! Right RGB pixbuf unused widget                                              !    
+! Right RGB pixbuf unused widget                                       !    
     width = 700
     height =195
     pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8_c_int,width,&
@@ -251,13 +251,14 @@ module handlers
 		  &val%pStruct%cat,val%pStruct%nodes,val%pStruct%nn,&
 		  &val%pStruct%elems,val%pStruct%ne,val%pStruct%mates,&
 		  &val%pStruct%nm,val%pStruct%sects,val%pStruct%ns)
+! Case if the data file is imported from Abaqus						   !
 	   elseif (filename(LEN_TRIM(filename)-2:LEN_TRIM(filename)).eq.&
 	   'inp') then
 		  call readinputfile(filename,nmax,emax,mmax,smax,&
 		  &val%pStruct%cat,val%pStruct%nodes,val%pStruct%nn,&
 		  &val%pStruct%elems,val%pStruct%ne,val%pStruct%mates,&
 		  &val%pStruct%nm,val%pStruct%sects,val%pStruct%ns)
-		  
+! Create the data file associated									   !
 		  call writedatafile(filename,nmax,emax,mmax,smax,&
 		  &val%pStruct%cat,val%pStruct%nodes,val%pStruct%nn,&
 		  &val%pStruct%elems,val%pStruct%ne,val%pStruct%mates,&
@@ -279,8 +280,9 @@ module handlers
     WRITE(*,*) 'Number of sections : ',val%pStruct%ns
     PRINT*
 ! Timoshenko's parameters are added : 04/2021						   !
+! Circular beam theory's parameters added : 06/2021					   !
     WRITE(*,'(3A3,8A9,A7)') 'NB','N1','N2','DENS','E','TgD','Nu','S',&
-   &                        'IZ','kY','radius','THEORY'
+   &                        'IZ','kY','RADIUS','THEORY'
     DO i=1,val%pStruct%NE
        WRITE(*,'(3I3,8D9.2,I7)') i,val%pStruct%elems(i,1),&
       &val%pStruct%elems(i,2),&
@@ -328,6 +330,7 @@ module handlers
      integer,dimension(nmax)::ipiv
      complex(kind=8),dimension(nmax*3,nmax*3)::kwst
      complex(kind=8),dimension(3*nmax)::b,work
+     
      
      call c_f_pointer(gdata, val) 
      if(readOk.EQ.1) then
@@ -389,7 +392,8 @@ module handlers
         DO n=1,nf
            w=2*pi*f
 ! The dynamic stiffness matrix is re-calculated for each frequency     !
-           kwst(1:3*val%pStruct%nn,1:3*val%pStruct%nn)=dcmplx(0.D0,0.D0)
+!           kwst(1:3*val%pStruct%nn,1:3*val%pStruct%nn)=dcmplx(0.D0,0.D0)
+			kwst(1:6,1:6)=dcmplx(0.D0,0.D0)
            CALL DYNAMICSTIFFNESS2D(W,val%pStruct%nodes,&
           &val%pStruct%elems,val%pStruct%mates,val%pStruct%sects,nmax,&
           &emax,mmax,smax,val%pStruct%ne,3*nmax,kwst)
@@ -397,6 +401,7 @@ module handlers
 ! A unit force is stored in second member b                            ! 
            b(1:3*val%pStruct%nn)=dcmplx(0.0,0.0)    
            b(idof)=dcmplx(1.0,0.0)
+           
 
 ! The algebraic system is solved with Lapack library                   !
            CALL ZSYSV('U',3*val%pStruct%nn,1,kwst,3*nmax,ipiv,b,3*nmax,&
@@ -589,48 +594,7 @@ module handlers
      endif
   end subroutine coords2pixs
   
-! function to get the coordinates of the center from 2 points		   !
-  subroutine getcenter(x1,y1,x2,y2,r,xcenter,ycenter)
-	 implicit none
-	 real(kind=8)::x1,y1,x2,y2,r,xmiddle,ymiddle,xcenter,ycenter
-	 real(kind=8)::xvector,yvector,l,l2
-	 
-	 xmiddle = (x1+x2)/2
-	 ymiddle = (y1+y2)/2
-! calculation of the distance between the 2 points	    		       !	 
-	 l = sqrt((x1-x2)**2+(y1-y2)**2)
-	 l2 = sqrt(r**2-(l/2)**2)
-! the center is founded with a vector product		     			   !
-	 yvector = -(x2-x1)/l
-	 xvector = (y2-y1)/l
-	 xcenter = xmiddle + l2*xvector
-	 ycenter = ymiddle + l2*yvector
-	 
-  end subroutine getcenter
-  
-! function to get the angle between the center of a circle and a point !
-! of his radius														   !
-  subroutine getangle(x,y,xc,yc,radius,alpha)
-	implicit none
-	real(kind=8)::x,y,xc,yc,radius,alpha
-	real(kind=8)::xvect,yvect,pdtscal,pdtvect,pi
-	
-	pi = 4.D0*DATAN(1.D0)
-	xvect = (x-xc)/radius
-	yvect = (y-yc)/radius
-! the scalar product give the cosinus								   !
-	pdtscal = xvect
-! the vector product give the sinus									   !
-	pdtvect = -yvect
-	if (pdtscal.GT.0) then
-		alpha = atan(pdtvect/pdtscal)
-	elseif (pdtscal.LT.0) then
-		alpha = pi + atan(pdtvect/pdtscal)
-	else
-		alpha = asin(pdtvect)
-	endif
-	
-  end subroutine getangle
+
 	 
 	 
 !  Drawing structure subroutine                                        !
@@ -640,7 +604,7 @@ module handlers
     type(Wdgts),pointer::val
     type(c_ptr) :: cc 
     real(kind=8)::x1,y1,x2,y2,x3,y3,xmin,xmax,ymin,ymax,px1,py1,px2,py2
-    real(kind=8)::px3,py3,length1,length2,pi,teta
+    real(kind=8)::px3,py3,length1,length2,pi,theta
     real(kind=8)::radius,getradius,angle1,angle2,radiuspix,radiuspix2
     integer i
        
@@ -684,9 +648,10 @@ module handlers
 		   call cairo_line_to(cc, px2,py2)
 		   call cairo_stroke(cc)
 	  elseif (radius.LT.0.0) then
-		   radius = abs(val%pStruct%sects(val%pStruct%elems(i,4),4))
-		   length1=sqrt((x1-x2)**2+(y1-y2)**2)
-		  ! Check if it's possible to create the circle				   !
+		   radius = abs(radius)
+		   ! calculation of the distance between the 2 points	       !	 
+		   length1 = sqrt((x1-x2)**2+(y1-y2)**2)
+		   ! Check if it's possible to create the circle		       !
 		   if (radius.LT.(length1/2)) then
 				write(*,*) 'Radius too short, impossible for element', i
 				write(*,*) 'Please retry with a correct value'
@@ -694,25 +659,23 @@ module handlers
 		   endif
 		   getradius=x1+radius
 		   
-		   call getcenter(x1,y1,x2,y2,radius,x3,y3)
+		   call getcenter(x1,y1,x2,y2,length1,radius,x3,y3)
 		   call coords2pixs(x3,y3,xmin,xmax,ymin,ymax,px3,py3,width,&
 		   &height,1.D0)
-		   call getangle(x1,y1,x3,y3,radius,angle1)
 		   
 		   call coords2pixs(getradius,y1,xmin,xmax,ymin,ymax,radiuspix,&
 		   &py1,width,height,1.D0)
 !  		   Get the value of the radius in the graphic window		   !
 		   radiuspix2 = sqrt((px1-radiuspix)**2)
-		   length2=length1/2
-!		   Teta is the opening angle between the 2 points			   !
-		   teta = 2*atan(length1/(2*sqrt((radius**2-length2**2))))
-		   angle2=angle1+teta
+		   call getangle(x1,y1,x3,y3,radius,angle1)
+!		   Theta is the opening angle between the 2 points			   !
+		   call gettheta(radius,length1,theta)
+		   angle2=angle1+theta
 !		   Draw the arc												   !
 		   call cairo_arc_negative(cc,px3,py3,radiuspix2,angle1,angle2)
 		   call cairo_stroke(cc)
 		   
 	  elseif (radius.GT.0.0) then
-		   radius = val%pStruct%sects(val%pStruct%elems(i,4),4)
 		   length1=sqrt((x1-x2)**2+(y1-y2)**2)
 		  ! Check if it's possible to create the circle				   !
 		   if (radius.LT.(length1/2)) then
@@ -722,19 +685,18 @@ module handlers
 		   endif
 		   getradius=x1+radius
 		   
-		   call getcenter(x1,y1,x2,y2,radius,x3,y3)
+		   call getcenter(x1,y1,x2,y2,length1,radius,x3,y3)
 		   call coords2pixs(x3,y3,xmin,xmax,ymin,ymax,px3,py3,width,&
 		   &height,1.D0)
-		   call getangle(x1,y1,x3,y3,radius,angle1)
 		   
 		   call coords2pixs(getradius,y1,xmin,xmax,ymin,ymax,radiuspix,&
 		   &py1,width,height,1.D0)
 !  		   Get the value of the radius in the graphic window		   !
 		   radiuspix2 = sqrt((px1-radiuspix)**2)
-		   length2=length1/2
-!		   Teta is the opening angle between the 2 points			   !
-		   teta = 2*atan(length1/(2*sqrt((radius**2-length2**2))))
-		   angle2=angle1+teta
+		   call getangle(x1,y1,x3,y3,radius,angle1)
+!		   Theta is the opening angle between the 2 points			   !
+		   call gettheta(radius,length1,theta)
+		   angle2=angle1+theta
 !		   Draw the arc												   !
 		   call cairo_arc(cc, px3, py3, radiuspix2, angle1, angle2)
 		   call cairo_stroke(cc)

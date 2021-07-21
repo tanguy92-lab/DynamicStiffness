@@ -58,18 +58,21 @@
 *tanguy.bevancon@supmeca.fr                                            *
 ************************************************************************
       
-      FUNCTION PLANARBEAM(W,S,IZ,L,RHO,NU,KY,E,TE,KW)
+      FUNCTION PLANARBEAM(W,S,IZ,L,RHO,NU,KY,R,E,TE,KW)
       IMPLICIT NONE
       LOGICAL PLANARBEAM
 
 *     Traction and XY-Bending Dynamic Stiffness Functions              *
       LOGICAL TRACTION, XYBENDING,XYRAYLEIGHBENDING,XYTIMOSHENKOBENDING
       
+*     Circular Dynamic Stiffness Functions                             *
+      LOGICAL DYNAMICDIFFERENTIALMATRIX,XYCIRCULARBEAM
+      
 *     Circular frequency                                               *
       DOUBLE PRECISION W
       
 *     Geometrical properties of the beam                               *      
-      DOUBLE PRECISION S,IZ,L
+      DOUBLE PRECISION S,IZ,L,R
       
 *     Material properties of the beam                                  *
       DOUBLE PRECISION RHO,NU
@@ -82,7 +85,7 @@
       DOUBLE PRECISION KY
       
 *     Dynamic Stiffness Matrix                                         *
-      COMPLEX*16 KW(6,6)
+      COMPLEX*16 KW(6,6),DW(6,6)
 
 *     Traction and XY-Bending Dynamic Stiffness Matrices               *      
       COMPLEX*16 KT(2,2),KB(4,4)
@@ -90,42 +93,51 @@
       INTEGER I,J
       LOGICAL RET
       
-*     Localisation vectors
+*     Localisation vectors                                             *
       INTEGER LTRACTION(2),LBENDING(4)
       DATA LTRACTION,LBENDING/1,4,2,3,5,6/
       
-*     Initialization of the Dynamic Stiffness Matrix
+*     Initialisation                                                   *
       DO I=1,6
-          DO J=1,6
-              KW(I,J)=0;    
-          ENDDO
+            DO J=1,6
+                    KW(I,J)=0
+            ENDDO
       ENDDO
+
             
 *     Computation of traction and xy-bending dynamic stiffness matrices* 
-      RET=TRACTION(W,S,L,RHO,E,KT)
-      IF (TE.EQ.1) THEN
-          RET=XYBENDING(W,S,IZ,L,RHO,E,KB)
-      ELSEIF (TE.EQ.2) THEN
-          RET=XYRAYLEIGHBENDING(W,S,IZ,L,RHO,E,KB)
+          RET=TRACTION(W,S,L,RHO,E,KT)
+          IF (TE.EQ.1) THEN
+              RET=XYBENDING(W,S,IZ,L,RHO,E,KB)
+          ELSEIF (TE.EQ.2) THEN
+              RET=XYRAYLEIGHBENDING(W,S,IZ,L,RHO,E,KB)
 * Add of the Timoshenko's method : 04/2021                             *
-      ELSEIF (TE.EQ.3) THEN
-          RET=XYTIMOSHENKOBENDING(W,S,IZ,L,RHO,E,NU,KY,KB)
+          ELSEIF (TE.EQ.3) THEN
+              RET=XYTIMOSHENKOBENDING(W,S,IZ,L,RHO,E,NU,KY,KB)
+* Add of Circular theory : 06/2021                                     *
+          ELSEIF (TE.EQ.4) THEN
+              RET=XYCIRCULARBEAM(W,S,IZ,L,RHO,E,NU,R,KY,KW)
+          ENDIF
+          
+      IF (TE.NE.4) THEN
+          
+*     Traction Components                                              * 
+          DO I=1,2
+              DO J=1,2
+                  KW(LTRACTION(I),LTRACTION(J))=KT(I,J)    
+              ENDDO
+          ENDDO
+          
+*     Bending Components                                               *
+          DO I=1,4
+              DO J=1,4
+                  KW(LBENDING(I),LBENDING(J))=KB(I,J)
+              ENDDO
+          ENDDO
+          
       ENDIF
       
-*     Traction Components                                              * 
-      DO I=1,2
-          DO J=1,2
-              KW(LTRACTION(I),LTRACTION(J))=KT(I,J)    
-          ENDDO
-      ENDDO
       
-*     Bending Components                                               *
-      DO I=1,4
-          DO J=1,4
-              KW(LBENDING(I),LBENDING(J))=KB(I,J)    
-          ENDDO
-      ENDDO
-      
-      PLANARBEAM=.TRUE.   
-            
+      PLANARBEAM=.TRUE.
+                
       END

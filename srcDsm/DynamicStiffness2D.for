@@ -40,10 +40,10 @@
 *          ELEMS : Table of elements (see ReadDataFile.for)            *
 *          MATES : Table of materials (see ReadDataFile.for)           *
 *          SECTS : Table of sections (see ReadDataFile.for)            *
-*          NMAX : The leading dimension of NODES                       *      
+*          NMAX : The leading dimension of NODES                       *
 *          EMAX : The leading dimension of ELEMS                       *
 *          MMAX : The leading dimension of MATES                       *
-*          SMAX : The leading dimension of SECTS                      *
+*          SMAX : The leading dimension of SECTS                       *
 *          NE : The number of elements                                 *
 *          DOFMAX : The leading dimension of KWST                      *
 *                                                                      *
@@ -53,9 +53,9 @@
 ************************************************************************  
 
 ************************************************************************
-*     Update for Timoshenko's theory                                   *
-* 04/2021 by Tanguy BEVANCON                                           *
-*tanguy.bevancon@supmeca.fr                                            *
+*     Update for Timoshenko's theory and circular beam theory          *
+* from 04/2021 to 07/2021 by Tanguy BEVANCON                           *
+* tanguy.bevancon@edu.supmeca.fr                                       *
 ************************************************************************
       
       SUBROUTINE DYNAMICSTIFFNESS2D(W,NODES,ELEMS,MATES,SECTS,NMAX,EMAX,
@@ -72,7 +72,9 @@
 
 *     Local variables                                                  *
       INTEGER E,IE,JE,I,J,TE
-      DOUBLE PRECISION L,S,IZ,RHO,X(2),ER,ETG,NU,KY
+      DOUBLE PRECISION L,S,IZ,RHO,X(2),Y(2),ER,ETG,NU,KY,R,THETA
+      DOUBLE PRECISION XC,YC,ALPHA1,ALPHA2
+      
       COMPLEX*16 YOUNG,KW(6,6)
       LOGICAL RET
 
@@ -81,12 +83,31 @@
       
 *     Main loop on elements                                            *
       DO E=1,NE
+      
+          TE=ELEMS(E,5) 
 *         Computing the element's length L                             *
           IE=ELEMS(E,1)
           JE=ELEMS(E,2)
-          X(1)=NODES(JE,1)-NODES(IE,1)
-          X(2)=NODES(JE,2)-NODES(IE,2)
-          L=DSQRT(X(1)**2+X(2)**2)
+          
+          
+*         Modification for Circular Beam : 06/2021                     *
+          R=SECTS(ELEMS(E,4),4)
+          
+          X(1)=NODES(IE,1)
+          X(2)=NODES(JE,1)
+          Y(1)=NODES(IE,2)
+          Y(2)=NODES(JE,2)
+          L=DSQRT((X(2)-X(1))**2+(Y(2)-Y(1))**2)
+          
+          IF (TE.EQ.4) THEN
+*         Compute calculation of L in case of circular beam
+*         For that, we calculate Theta
+              CALL GETCENTER(X(1),Y(1),X(2),Y(2),L,R,XC,YC)
+              CALL GETANGLE(X(1),Y(1),XC,YC,R,ALPHA1)
+      
+              CALL GETANGLE(X(2),Y(2),XC,YC,R,ALPHA2)
+              L=R*ABS(ALPHA2-ALPHA1)
+          ENDIF
           
 *         Extraction of material and section characteristics           *
           S=SECTS(ELEMS(E,4),1)
@@ -98,16 +119,20 @@
           NU=MATES(ELEMS(E,3),4)
           KY=SECTS(ELEMS(E,4),3)
 
+
 *         Calculating complex Young modulus                            *
           YOUNG=DCMPLX(ER,ER*ETG)
           
 *         Computing the element dynamic stiffness matrix in a global   *
 *         coordinate system                                            *
-          TE=ELEMS(E,5)         
+          
 *         Update inputs for Timoshenko  :   04/2021                    *
-          RET=GLOBALPLANARBEAM(W,S,IZ,L,RHO,YOUNG,NU,KY,X,TE,KW)
+          RET=GLOBALPLANARBEAM(W,S,IZ,L,RHO,YOUNG,NU,KY,R,X,Y,TE,KW)
+          
 
-*         Assembling the processed matrix                              *          
+*         Assembling the processed matrix                              *
           CALL PLANARASSEMBLY(KW,IE,JE,DOFMAX,KWST)
+          
+
       ENDDO
       END

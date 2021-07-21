@@ -35,9 +35,9 @@
 ************************************************************************
 
 ************************************************************************
-*     Update for Timoshenko's theory                                   *
-* 04/2021 by Tanguy BEVANCON                                           *
-*tanguy.bevancon@supmeca.fr                                            *
+*     Update for Timoshenko's theory and circular beam theory          *
+* from 04/2021 to 07/2021 by Tanguy BEVANCON                           *
+* tanguy.bevancon@edu.supmeca.fr                                       *
 ************************************************************************
    
       PROGRAM DYNAMICSTIFFNESS
@@ -46,7 +46,7 @@
 *     Declarations of static arrays that describe the structure        *
       INTEGER NMAX,EMAX,SMAX,MMAX
       PARAMETER (NMAX=100,EMAX=100,SMAX=100,MMAX=100)
-      DOUBLE PRECISION NODES(NMAX,2),MATES(MMAX,4),SECTS(SMAX,3)
+      DOUBLE PRECISION NODES(NMAX,2),MATES(MMAX,4),SECTS(SMAX,4)
       INTEGER ELEMS(EMAX,5)
 
 *     CAT is the category of problem (Yet only 2DFRAME)                *
@@ -59,7 +59,7 @@
       
 *     W and F are circular frequency and frequency respectively        * 
 *     [F1,F2] is the frequency range, FSTEP the frequency step         *      
-      DOUBLE PRECISION W,F,PI,F1,F2,FSTEP
+      DOUBLE PRECISION W,F,PI,F1,F2,FSTEP,VF
 
 *     FDOF is the chosen DOF subjected to an unit harmonic force and   *
 *     DDOF is the chosen DOF processed response                        *
@@ -71,7 +71,7 @@
       
 *     Lapack's variables required by ZSYSV                             *
       COMPLEX*16 WORK(3*NMAX)
-      INTEGER IPIV(NMAX),INFO
+      INTEGER IPIV(3*NMAX),INFO
       
 *     The name of the text data file                                   *
       CHARACTER*80 FILENAME
@@ -96,6 +96,7 @@
      1 THEN
           CALL READDATAFILE(FILENAME,NMAX,EMAX,MMAX,SMAX,CAT,NODES,NN,
      1                  ELEMS,NE,MATES,NM,SECTS,NS)
+*     Case if the data file is imported from Abaqus		         	   *
       ELSEIF (FILENAME(LEN_TRIM(FILENAME)-2:LEN_TRIM(FILENAME)).
      1 EQ.'inp') THEN
           CALL READINPUTFILE(FILENAME,NMAX,EMAX,MMAX,SMAX,CAT,NODES,NN,
@@ -105,7 +106,7 @@
       WRITE(*,*) 'File ', TRIM(FILENAME), ' created' 
       ENDIF
       
-*      
+
 *     The characteristics of the structure are displayed               *
       PRINT*
       WRITE(*,*) 'Type of structure : ',CAT
@@ -115,13 +116,13 @@
       WRITE(*,*) 'Number of sections : ',NS
       PRINT*
 *     Display modified for the Timoshenko's theory : 04/2021           *
-      WRITE(*,'(3A3,7A9,A7)') 'NB','N1','N2','DENS','E','TgD','Nu','S',
-     1                        'IZ','kY','THEORY'
+      WRITE(*,'(3A3,8A9,A7)') 'NB','N1','N2','DENS','E','TgD','Nu','S',
+     1                        'IZ','kY','RADIUS','THEORY'
       DO I=1,NE
-          WRITE(*,'(3I3,7D9.2,I7)') I,ELEMS(I,1),ELEMS(I,2),
+          WRITE(*,'(3I3,8D9.2,I7)') I,ELEMS(I,1),ELEMS(I,2),
      1    MATES(ELEMS(I,3),1),MATES(ELEMS(I,3),2),MATES(ELEMS(I,3),3),
      2    MATES(ELEMS(I,3),4),SECTS(ELEMS(I,4),1),SECTS(ELEMS(I,4),2),
-     3    SECTS(ELEMS(I,4),3),ELEMS(I,5)
+     3    SECTS(ELEMS(I,4),3),SECTS(ELEMS(I,4),4),ELEMS(I,5)
       ENDDO
      
       
@@ -133,8 +134,9 @@
       READ(*,*) F1,F2
       WRITE(*,*) 'Enter the number of processed frequencies'
       READ(*,*) NF
-      WRITE(*,*) 'Enter the DOF subjected to an harmonic unit force'
-      READ(*,*) FDOF
+      WRITE(*,*) 'Enter the DOF subjected to an harmonic force and its 
+     1 value : FDOF, VF'
+      READ(*,*) FDOF,VF
       WRITE(*,*) 'Enter the processed harmonic response DOF'
       READ(*,*) DDOF
       WRITE(10,*) NF
@@ -152,11 +154,13 @@
 *         Computation of the dynamic stiffness matrix                 *
           CALL DYNAMICSTIFFNESS2D(W,NODES,ELEMS,MATES,SECTS,NMAX,EMAX,
      1                            MMAX,SMAX,NE,3*NMAX,KWST)
+
 *         Definition of the force vector                              *          
           DO I=1,3*NN
               B(I)=DCMPLX(0.0,0.0)    
           ENDDO
-          B(FDOF)=DCMPLX(1.0,0.0)
+          B(FDOF)=DCMPLX(VF,0.0)
+          
           
 *         Solving the linear algebraic system                         *          
           CALL ZSYSV('U',3*NN,1,KWST,3*NMAX,IPIV,B,3*NMAX,WORK,3*NMAX,

@@ -14,6 +14,8 @@ _SRC=ReadDataFile.for\
     XYBending.for\
     XYRayleighBending.for\
     XYTimoshenkoBending.for\
+    DynamicDifferentialMatrix.for\
+    XYCircularBeam.for\
     Complex16Hyperbolic.for
 SRC=$(patsubst %,srcGtk/%,$(_SRC))
 _OBJ=$(subst .for,.o,$(_SRC))

@@ -42,10 +42,10 @@
 *     ...                                                              *
 *     NM RNM ENM DNM NUNM                                              *
 *     SECTIONS NS                                                      *
-*     1 S1 IZ1 KY1                                                     *
-*     2 S2 IZ2 KY2                                                     *
+*     1 S1 IZ1 KY1 RA1                                                 *
+*     2 S2 IZ2 KY2 RA2                                                 *
 *     ...                                                              *      
-*     NS SNS IZNS KYNS                                                 * 
+*     NS SNS IZNS KYNS RNS                                             * 
 *                                                                      *      
 *     Where :                                                          *
 *     ST : Type of structure (ONLY 2DFRAME)                            *
@@ -55,7 +55,8 @@
 *     N1I,N2I : Node 1 and Node 2 of element I                         *
 *     MI : Constitutive material of element I                          *
 *     SI : Section of element I                                        *
-*     TI : Type of element I (1 =Bernoulli, 2 =Rayleigh, 3 =Timoshenko)*
+*     TI : Type of element I (1 =Bernoulli, 2 =Rayleigh, 3 =Timoshenko,*
+*          4 =Circular Beam)                                           *
 *     NM : Number of materials                                         *
 *     RI : Mass density of material I                                  *
 *     EI : Young modulus of material I                                 *
@@ -65,6 +66,7 @@
 *     SI : Area of section I                                           *
 *     IZI : Quadratic moment of inertia of section I                   *
 *     KY : Timoshenko's Section Reduction                              *
+*     RAI : Radius of the element                                      *
 *                                                                      *
 *     Input Args :                                                     * 
 *          FILENAME : The data filename                                *
@@ -86,9 +88,9 @@
 ************************************************************************ 
 
 ************************************************************************
-*     Update for Timoshenko's theory                                   *
-* 04/2021 by Tanguy BEVANCON                                           *
-*tanguy.bevancon@edu.supmeca.fr                                        *
+*     Update for Timoshenko's theory and circular beam theory          *
+* from 04/2021 to 07/2021 by Tanguy BEVANCON                           *
+* tanguy.bevancon@edu.supmeca.fr                                       *
 ************************************************************************
   
       SUBROUTINE READDATAFILE(FILENAME,NMAX,EMAX,MMAX,SMAX,CAT,NODES,NN,
@@ -135,7 +137,7 @@
       DO I=1,NE
           READ(10,*) K,(ELEMS(K,J),J=1,5)
 *         Check if Timoshenko's theory is used  :  04/2021             *
-          IF (ELEMS(K,5).EQ.3) THEN
+          IF (ELEMS(K,5).EQ.3 .OR. ELEMS(K,5).EQ.4) THEN
                 TIMOSHENKO = .TRUE.
           ENDIF
       ENDDO

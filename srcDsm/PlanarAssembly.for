@@ -55,11 +55,6 @@
 
       INTEGER I,J,IG,JG
       
-      WRITE(*,*) 'matrice KW initiale:'
-          DO I=1,6
-                WRITE(*,*) (KW(I,J),J=1,6)
-          ENDDO
-      
 * Addition of the top-left submatrix block                             *     
       IG=(IE-1)*3
       JG=(IE-1)*3
@@ -95,10 +90,5 @@
               KWST(IG+I,JG+J)=KWST(IG+I,JG+J)+KW(3+I,3+J)
           ENDDO
       ENDDO
-      
-      WRITE(*,*) 'matrice KWST finale:'
-          DO I=1,6
-                WRITE(*,*) (KWST(I,J),J=1,6)
-          ENDDO
 
       END

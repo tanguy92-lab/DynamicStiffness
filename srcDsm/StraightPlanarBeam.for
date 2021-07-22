@@ -53,9 +53,9 @@
 ************************************************************************
 
 ************************************************************************
-*     Update for Timoshenko's theory                                   *
-* 04/2021 by Tanguy BEVANCON                                           *
-*tanguy.bevancon@supmeca.fr                                            *
+*     Update for Timoshenko's theory and circular beam theory          *
+* from 04/2021 to 07/2021 by Tanguy BEVANCON                           *
+* tanguy.bevancon@edu.supmeca.fr                                       *
 ************************************************************************
       
       FUNCTION PLANARBEAM(W,S,IZ,L,RHO,NU,KY,R,E,TE,KW)
